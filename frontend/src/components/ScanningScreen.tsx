@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShieldAlert, Cpu } from "lucide-react";
+import { getApiUrl } from "@/utils/api";
 
 interface ScanningScreenProps {
   imageSrc: string;
@@ -56,7 +57,7 @@ export default function ScanningScreen({ imageSrc, onScanComplete, onFail }: Sca
         formData.append("file", blob, "selfie.jpg");
 
         // Send to FastAPI
-        const apiResponse = await fetch("http://localhost:8000/api/analyze", {
+        const apiResponse = await fetch(`${getApiUrl()}/api/analyze`, {
           method: "POST",
           body: formData
         });

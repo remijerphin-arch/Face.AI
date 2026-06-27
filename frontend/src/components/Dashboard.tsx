@@ -8,6 +8,7 @@ import {
   Maximize2, Eye, Award, Heart, HelpCircle, User, Star, Send, X, ArrowUpRight
 } from "lucide-react";
 import confetti from "canvas-confetti";
+import { getApiUrl } from "@/utils/api";
 
 interface DashboardProps {
   imageSrc: string;
@@ -133,7 +134,7 @@ export default function Dashboard({ imageSrc, analysis, onReset }: DashboardProp
     setChatLoading(true);
 
     try {
-      const response = await fetch("http://localhost:8000/api/chat", {
+      const response = await fetch(`${getApiUrl()}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
