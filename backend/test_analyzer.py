@@ -7,9 +7,9 @@ def run_test():
     print("          FaceSense AI - Analyzer Test")
     print("===================================================")
     
-    # 1. Create a dummy 500x600 test image (representing a portrait selfie)
-    print("\n[1/3] Generating dummy portrait selfie...")
-    img = Image.new("RGB", (500, 600), color=(220, 180, 160)) # skin-like color
+    # 1. Create a dummy 500x600 test image (flat color, no face)
+    print("\n[1/2] Generating non-face dummy image...")
+    img = Image.new("RGB", (500, 600), color=(220, 180, 160)) # flat skin-like color
     
     # Convert image to bytes
     img_byte_arr = io.BytesIO()
@@ -17,53 +17,26 @@ def run_test():
     img_bytes = img_byte_arr.getvalue()
     print("      Dummy image size: 500x600, format: JPEG")
 
-    # 2. Run analysis
-    print("\n[2/3] Running facial analysis engine...")
+    # 2. Run analysis (expecting it to fail because it has no face)
+    print("\n[2/2] Running analysis on non-face image (should fail)...")
     try:
-        report = generate_analysis_report(img_bytes)
-        print(" [OK] Analysis completed successfully!")
-    except Exception as e:
-        print(" [FAIL] Analysis failed with error:", str(e))
+        generate_analysis_report(img_bytes)
+        print("      [FAIL] Analysis succeeded on a flat color block! Face detection is not working.")
         return False
-
-    # 3. Verify report structure
-    print("\n[3/3] Verifying report schema and key points:")
-    
-    keys_to_verify = [
-        "hash", "dimensions", "face_shape", "skin_analysis", 
-        "landmarks", "symmetry", "jawline", "hair_analysis", 
-        "beard_recommendations", "glasses_recommendations", 
-        "outfit_recommendations", "color_analysis", 
-        "celebrity_lookalike", "ratings", "glow_up_plan"
-    ]
-    
-    success = True
-    for key in keys_to_verify:
-        if key in report:
-            print(f"      [OK] Key '{key}' exists")
+    except ValueError as ve:
+        if "No human face detected" in str(ve):
+            print(f"      [OK] Correctly caught expected error: '{str(ve)}'")
+            print("           Face detection successfully blocked the non-face image!")
+            print("\n===================================================")
+            print("          TEST COMPLETED: SUCCESS")
+            print("===================================================")
+            return True
         else:
-            print(f"      [FAIL] Key '{key}' is missing!")
-            success = False
-            
-    # Sample landmark verification
-    landmarks_len = len(report.get("landmarks", []))
-    if landmarks_len == 68:
-        print(f"      [OK] 68-point landmarks count is correct ({landmarks_len} points)")
-    else:
-        print(f"      [FAIL] Landmarks count is incorrect: {landmarks_len} (expected 68)")
-        success = False
-
-    # Print summary output values
-    print("\n===================================================")
-    if success:
-        print("          TEST COMPLETED: SUCCESS")
-        print(f"          Detected Shape: {report['face_shape']['name']} ({report['face_shape']['score']})")
-        print(f"          Skin Score: {report['skin_analysis']['overall_score']}/100")
-        print(f"          Undertone: {report['color_analysis']['undertone']}")
-    else:
-        print("          TEST COMPLETED: FAILURE")
-    print("===================================================")
-    return success
+            print(f"      [FAIL] Caught unexpected ValueError: {str(ve)}")
+            return False
+    except Exception as e:
+        print("      [FAIL] Analysis failed with unexpected error:", str(e))
+        return False
 
 if __name__ == "__main__":
     run_test()

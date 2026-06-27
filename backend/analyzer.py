@@ -2,6 +2,40 @@ import hashlib
 import random
 from PIL import Image, ImageStat
 import io
+import cv2
+import numpy as np
+
+def detect_face(image_bytes: bytes):
+    """
+    Detect the largest human face in the image using Haar Cascades.
+    Returns (x, y, w, h) of the face bounding box, or None if no face is found.
+    """
+    nparr = np.frombuffer(image_bytes, np.uint8)
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    if img is None:
+        return None
+        
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    
+    # Load default OpenCV Haar Cascade for face detection
+    cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+    face_cascade = cv2.CascadeClassifier(cascade_path)
+    
+    # Detect faces
+    faces = face_cascade.detectMultiScale(
+        gray,
+        scaleFactor=1.15,
+        minNeighbors=4,
+        minSize=(40, 40)
+    )
+    
+    if len(faces) == 0:
+        return None
+        
+    # Find the largest face detected
+    largest_face = max(faces, key=lambda f: f[2] * f[3])
+    return (int(largest_face[0]), int(largest_face[1]), int(largest_face[2]), int(largest_face[3]))
+
 
 def get_image_hash(image_bytes: bytes) -> str:
     """Generate a MD5 hash of the image bytes for stable seeding."""
@@ -48,24 +82,31 @@ def analyze_image_colors(image: Image.Image):
         "aspect_ratio": image.width / image.height
     }
 
-def generate_landmarks(width: int, height: int, aspect_ratio: float, seed: int):
+def generate_landmarks(width: int, height: int, aspect_ratio: float, seed: int, face_box: tuple = None):
     """
-    Generate realistic 68-point facial landmarks adapted to image size.
+    Generate realistic 68-point facial landmarks adapted to image size or face box.
     Adds organic offsets based on seed to match different face shapes.
     """
     random.seed(seed)
     
-    # Determine center and scale of the face
-    # Assume face occupies the center 50-60% of the image
-    cx = width / 2
-    cy = height * 0.48
-    
-    # Scale face based on smaller dimension
-    scale = min(width, height) * 0.28
-    
-    # Squeeze/stretch based on aspect ratio and random factor
-    y_scale_adj = 1.0 + (random.uniform(-0.05, 0.05))
-    x_scale_adj = (1.0 / aspect_ratio) * 0.9 + (random.uniform(-0.05, 0.05))
+    if face_box:
+        # Align exactly with the detected face bounding box
+        fx, fy, fw, fh = face_box
+        cx = fx + fw / 2
+        cy = fy + fh * 0.48
+        scale = min(fw, fh) * 0.55
+        
+        y_scale_adj = 1.0 + (random.uniform(-0.03, 0.03))
+        x_scale_adj = 1.0 + (random.uniform(-0.03, 0.03))
+    else:
+        # Fallback to center of the image
+        cx = width / 2
+        cy = height * 0.48
+        scale = min(width, height) * 0.28
+        
+        y_scale_adj = 1.0 + (random.uniform(-0.05, 0.05))
+        x_scale_adj = (1.0 / aspect_ratio) * 0.9 + (random.uniform(-0.05, 0.05))
+
     
     landmarks = []
     
@@ -158,6 +199,11 @@ def generate_analysis_report(image_bytes: bytes) -> dict:
     """
     Generate an extremely detailed, high-quality, and realistic Face Analysis Report.
     """
+    # Detect face (verify image contains a face)
+    face_box = detect_face(image_bytes)
+    if face_box is None:
+        raise ValueError("No human face detected in the image. Please upload a clear photo showing your face.")
+        
     # Read image
     img = Image.open(io.BytesIO(image_bytes))
     width, height = img.size
@@ -194,7 +240,7 @@ def generate_analysis_report(image_bytes: bytes) -> dict:
     }
     
     # 4. Generate Landmarks
-    landmarks = generate_landmarks(width, height, ratio, seed)
+    landmarks = generate_landmarks(width, height, ratio, seed, face_box)
     
     # 5. Skin Metrics
     skin_score = random.randint(85, 96)

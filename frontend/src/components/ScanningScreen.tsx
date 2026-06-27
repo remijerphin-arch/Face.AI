@@ -11,6 +11,87 @@ interface ScanningScreenProps {
   onFail: (error: string) => void;
 }
 
+function getSimulated68Points(cx: number, cy: number, scale: number) {
+  const points: { x: number; y: number }[] = [];
+  const x_scale_adj = 1.0;
+  const y_scale_adj = 1.0;
+
+  // 1. Jawline (0-16)
+  for (let i = 0; i < 17; i++) {
+    const angle = -180 + (i * 180 / 16);
+    const rad = angle * Math.PI / 180;
+    const x = cx + scale * 0.95 * Math.sin(rad) * 0.9;
+    const y = cy + scale * 1.15 * Math.cos(rad) * -0.9 + (i === 8 ? scale * 0.15 : 0);
+    points.push({ x, y });
+  }
+
+  // 2. Left Eyebrow (17-21)
+  for (let i = 0; i < 5; i++) {
+    const x = cx - scale * (0.65 - i * 0.1) * x_scale_adj;
+    const y = cy - scale * (0.42 + (i < 3 ? i * 0.04 : (4 - i) * 0.04)) * y_scale_adj;
+    points.push({ x, y });
+  }
+
+  // 3. Right Eyebrow (22-26)
+  for (let i = 0; i < 5; i++) {
+    const x = cx + scale * (0.25 + i * 0.1) * x_scale_adj;
+    const y = cy - scale * (0.42 + (i > 1 ? (4 - i) * 0.04 : i * 0.04)) * y_scale_adj;
+    points.push({ x, y });
+  }
+
+  // 4. Nose Bridge & Tip (27-35)
+  for (let i = 0; i < 4; i++) {
+    const x = cx;
+    const y = cy - scale * (0.3 - i * 0.1) * y_scale_adj;
+    points.push({ x, y });
+  }
+  for (let i = 0; i < 5; i++) {
+    const x = cx - scale * (0.2 - i * 0.1) * x_scale_adj;
+    const y = cy + scale * 0.12 * y_scale_adj;
+    points.push({ x, y });
+  }
+
+  // 5. Left Eye (36-41)
+  const eyeLeftCx = cx - scale * 0.42 * x_scale_adj;
+  const eyeLeftCy = cy - scale * 0.22 * y_scale_adj;
+  const eyePts = [
+    [-0.15, 0.0], [-0.07, -0.05], [0.07, -0.05],
+    [0.15, 0.0], [0.07, 0.05], [-0.07, 0.05]
+  ];
+  eyePts.forEach(pt => {
+    points.push({ x: eyeLeftCx + pt[0] * scale * x_scale_adj, y: eyeLeftCy + pt[1] * scale * y_scale_adj });
+  });
+
+  // 6. Right Eye (42-47)
+  const eyeRightCx = cx + scale * 0.42 * x_scale_adj;
+  const eyeRightCy = cy - scale * 0.22 * y_scale_adj;
+  eyePts.forEach(pt => {
+    points.push({ x: eyeRightCx + pt[0] * scale * x_scale_adj, y: eyeRightCy + pt[1] * scale * y_scale_adj });
+  });
+
+  // 7. Outer Lips (48-59)
+  const lipCx = cx;
+  const lipCy = cy + scale * 0.45 * y_scale_adj;
+  const outerPts = [
+    [-0.3, 0.0], [-0.2, -0.08], [-0.08, -0.12], [0.0, -0.1], [0.08, -0.12], [0.2, -0.08], [0.3, 0.0],
+    [0.2, 0.12], [0.08, 0.16], [0.0, 0.15], [-0.08, 0.16], [-0.2, 0.12]
+  ];
+  outerPts.forEach(pt => {
+    points.push({ x: lipCx + pt[0] * scale * x_scale_adj, y: lipCy + pt[1] * scale * y_scale_adj });
+  });
+
+  // 8. Inner Lips (60-67)
+  const innerPts = [
+    [-0.24, 0.0], [-0.1, -0.03], [0.0, -0.02], [0.1, -0.03], [0.24, 0.0],
+    [0.1, 0.06], [0.0, 0.07], [-0.1, 0.06]
+  ];
+  innerPts.forEach(pt => {
+    points.push({ x: lipCx + pt[0] * scale * x_scale_adj, y: lipCy + pt[1] * scale * y_scale_adj });
+  });
+
+  return points;
+}
+
 const STAGES = [
   "Detecting Face Boundary",
   "Facial Landmark Calibration",
@@ -123,6 +204,7 @@ export default function ScanningScreen({ imageSrc, onScanComplete, onFail }: Sca
     let animationFrameId: number;
     let scanY = 0;
     let scanDirection = 1;
+    let morphProgress = 0;
 
     const renderCanvas = () => {
       const canvas = canvasRef.current;
@@ -160,55 +242,32 @@ export default function ScanningScreen({ imageSrc, onScanComplete, onFail }: Sca
       const cy = ch * 0.48;
       const scale = Math.min(cw, ch) * 0.28;
       
-      // Basic 68 keypoint locations (simplified subsets for rendering connection wires)
-      // We will generate them on the fly based on stage progress to show converging network
-      const points: { x: number; y: number }[] = [];
-      const seedVal = 42; // static seed for animation consistency
-      
-      // Generate jawline, eyes, nose, mouth nodes
-      const currentPct = currentStageIndex / STAGES.length;
+      const simulatedPoints = getSimulated68Points(cx, cy, scale);
+      let points = simulatedPoints;
 
-      // Draw outer face ring
-      for (let i = 0; i < 17; i++) {
-        const angle = -180 + (i * 180 / 16);
-        const rad = angle * Math.PI / 180;
-        // Slowly converge points from randomized state to aligned face layout
-        const targetX = cx + scale * 0.95 * Math.sin(rad) * 0.9;
-        const targetY = cy + scale * 1.15 * Math.cos(rad) * -0.9 + (i === 8 ? scale * 0.15 : 0);
-        points.push({ x: targetX, y: targetY });
-      }
+      // If backend report has arrived, dynamically transition points to the real face coordinates
+      if (apiReportRef.current && apiReportRef.current.landmarks) {
+        morphProgress = Math.min(1.0, morphProgress + 0.03); // Increment morph frame-by-frame
+        
+        const realLandmarks = apiReportRef.current.landmarks;
+        const scaleX = dw / img.width;
+        const scaleY = dh / img.height;
+        
+        const mappedRealPoints = realLandmarks.map((pt: any) => {
+          return {
+            x: dx + pt.x * scaleX,
+            y: dy + pt.y * scaleY
+          };
+        });
 
-      // Eyebrows
-      for (let i = 0; i < 10; i++) {
-        const side = i < 5 ? -1 : 1;
-        const offset = i < 5 ? i : i - 5;
-        const targetX = cx + side * scale * (0.25 + offset * 0.08);
-        const targetY = cy - scale * (0.35 + (offset === 2 ? 0.04 : 0));
-        points.push({ x: targetX, y: targetY });
-      }
-
-      // Eyes
-      const drawEye = (ecx: number, ecy: number) => {
-        for (let i = 0; i < 6; i++) {
-          const rad = (i * 60) * Math.PI / 180;
-          points.push({ x: ecx + scale * 0.09 * Math.cos(rad), y: ecy + scale * 0.05 * Math.sin(rad) });
-        }
-      };
-      drawEye(cx - scale * 0.38, cy - scale * 0.15); // Left
-      drawEye(cx + scale * 0.38, cy - scale * 0.15); // Right
-
-      // Nose
-      points.push({ x: cx, y: cy - scale * 0.1 });
-      points.push({ x: cx, y: cy });
-      points.push({ x: cx, y: cy + scale * 0.08 });
-      for (let i = -2; i <= 2; i++) {
-        points.push({ x: cx + i * scale * 0.06, y: cy + scale * 0.12 });
-      }
-
-      // Mouth
-      for (let i = 0; i < 8; i++) {
-        const rad = (i * 45) * Math.PI / 180;
-        points.push({ x: cx + scale * 0.22 * Math.cos(rad), y: cy + scale * 0.38 + scale * 0.08 * Math.sin(rad) });
+        // Interpolate between centered simulated points and real mapped coordinates
+        points = simulatedPoints.map((simPt, idx) => {
+          const realPt = mappedRealPoints[idx] || simPt;
+          return {
+            x: simPt.x + (realPt.x - simPt.x) * morphProgress,
+            y: simPt.y + (realPt.y - simPt.y) * morphProgress
+          };
+        });
       }
 
       // RENDER CONNECTIONS (only if we've passed landmark stage)
@@ -233,10 +292,31 @@ export default function ScanningScreen({ imageSrc, onScanComplete, onFail }: Sca
         ctx.lineWidth = 1.0;
         ctx.strokeStyle = "rgba(161, 0, 255, 0.4)";
         
-        // Jawline Outline
+        // Jawline Outline (0-16)
         ctx.beginPath();
         ctx.moveTo(points[0].x, points[0].y);
         for (let i = 1; i < 17; i++) ctx.lineTo(points[i].x, points[i].y);
+        ctx.stroke();
+
+        // Left Eye (36-41)
+        ctx.beginPath();
+        ctx.moveTo(points[36].x, points[36].y);
+        for (let i = 37; i < 42; i++) ctx.lineTo(points[i].x, points[i].y);
+        ctx.closePath();
+        ctx.stroke();
+
+        // Right Eye (42-47)
+        ctx.beginPath();
+        ctx.moveTo(points[42].x, points[42].y);
+        for (let i = 43; i < 48; i++) ctx.lineTo(points[i].x, points[i].y);
+        ctx.closePath();
+        ctx.stroke();
+
+        // Lips Outer (48-59)
+        ctx.beginPath();
+        ctx.moveTo(points[48].x, points[48].y);
+        for (let i = 49; i < 60; i++) ctx.lineTo(points[i].x, points[i].y);
+        ctx.closePath();
         ctx.stroke();
       }
 

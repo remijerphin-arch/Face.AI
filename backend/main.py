@@ -57,6 +57,8 @@ async def analyze_face(file: UploadFile = File(...)):
         image_bytes = await file.read()
         report = generate_analysis_report(image_bytes)
         return report
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to analyze image: {str(e)}")
 

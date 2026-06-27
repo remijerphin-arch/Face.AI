@@ -104,17 +104,32 @@ export default function Home() {
               <AlertTriangle className="w-8 h-8 animate-pulse" />
             </div>
 
-            <h2 className="font-outfit font-bold text-xl text-foreground">Analysis Connection Lost</h2>
-            <p className="text-xs text-foreground/60 mt-3 leading-relaxed">
-              We couldn't connect to the FaceSense AI core. This usually happens if the backend server is not running or is starting up on your system.
-            </p>
+            {errorMsg?.includes("No human face detected") || errorMsg?.includes("No face detected") ? (
+              <>
+                <h2 className="font-outfit font-bold text-xl text-foreground">Face Detection Failed</h2>
+                <p className="text-xs text-foreground/60 mt-3 leading-relaxed">
+                  We couldn't find a clear human face in the image you provided. Make sure your photo is well-lit, fully visible, not blurry, and shows your face clearly from the front.
+                </p>
+                <div className="mt-5 p-3 rounded-xl bg-foreground/5 text-left border border-foreground/5 space-y-1.5 font-mono text-[10px] text-foreground/50">
+                  <div className="font-bold text-foreground/70 text-red-400">ERROR MESSAGE:</div>
+                  <div className="text-red-300/80 leading-relaxed font-sans">{errorMsg}</div>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="font-outfit font-bold text-xl text-foreground">Analysis Connection Lost</h2>
+                <p className="text-xs text-foreground/60 mt-3 leading-relaxed">
+                  We couldn't connect to the FaceSense AI core. This usually happens if the backend server is not running or is starting up on your system.
+                </p>
 
-            <div className="mt-5 p-3 rounded-xl bg-foreground/5 text-left border border-foreground/5 space-y-1.5 font-mono text-[10px] text-foreground/50">
-              <div className="font-bold text-foreground/70">TROUBLESHOOTING:</div>
-              <div>• Ensure the FastAPI server is running on <span className="text-electric-blue">http://localhost:8000</span></div>
-              <div>• Check terminal logs for compile or port conflicts</div>
-              {errorMsg && <div className="text-red-400 mt-2 break-words">LOG: {errorMsg}</div>}
-            </div>
+                <div className="mt-5 p-3 rounded-xl bg-foreground/5 text-left border border-foreground/5 space-y-1.5 font-mono text-[10px] text-foreground/50">
+                  <div className="font-bold text-foreground/70">TROUBLESHOOTING:</div>
+                  <div>• Ensure the FastAPI server is running on <span className="text-electric-blue">http://localhost:8000</span></div>
+                  <div>• Check terminal logs for compile or port conflicts</div>
+                  {errorMsg && <div className="text-red-400 mt-2 break-words">LOG: {errorMsg}</div>}
+                </div>
+              </>
+            )}
 
             <div className="flex gap-3 mt-8">
               <button
