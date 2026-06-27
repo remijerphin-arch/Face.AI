@@ -1,0 +1,25 @@
+# Next.js Build & Package Directories
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.next-env.d.ts
+
+# Python Virtual Environment & Caches
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+backend/*.pyo
+backend/*.pyd
+backend/.pytest_cache/
+
+# OS Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment Keys (if any)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
