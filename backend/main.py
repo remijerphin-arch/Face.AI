@@ -18,6 +18,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+def read_root():
+    return {
+        "status": "online",
+        "service": "FaceSense AI Backend Engine",
+        "message": "To view the user interface, please open the port 3000 link in your browser."
+    }
+
+
 class ChatMessage(BaseModel):
     role: str # "user" or "assistant"
     content: str
